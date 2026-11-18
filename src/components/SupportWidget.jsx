@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Headset, ArrowRight, X, Paperclip, Send, Lock } from "lucide-react"
 import { getCurrentTime } from "../utils"
+import { askAI } from "../chat"
 
 const welcomeMessage = {
   id: 1,
@@ -31,7 +32,7 @@ export default function SupportWidget() {
   // ---------------------------------------------------------------
   // YOUR PART: every visitor message goes through this function.
   // ---------------------------------------------------------------
-  function sendMessage(messageText) {
+  async function sendMessage(messageText) {
     const trimmed = messageText.trim()
     if (!trimmed) return
 
@@ -42,6 +43,14 @@ export default function SupportWidget() {
       time: getCurrentTime(),
     }
     setMessages((prev) => [...prev, newMessage])
+    const reply = await askAI(trimmed)
+    const staffMessage = {
+      id: Date.now(),
+      from: "staff",
+      text: reply,
+      time: getCurrentTime(),
+    }
+    setMessages((prev) => [...prev, staffMessage])
 
     // TODO (backend / AI): send `trimmed` to your API here.
     // When the reply comes back, add it with from: "staff".
