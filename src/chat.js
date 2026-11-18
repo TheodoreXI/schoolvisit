@@ -5,10 +5,10 @@ import OpenAI from "openai";
 const openai = new OpenAI({
     apiKey: import.meta.env.VITE_AI_KEY,
     baseURL: import.meta.env.VITE_AI_URL,
-    dangerouslyAllowBrowser: true,
+    dangerouslyAllowBrowser: true
 })
 
-export async function askAI(msg)
+export async function askAI(msg, msgBuilder)
 {
     const messages = [
         {
@@ -43,9 +43,14 @@ export async function askAI(msg)
         const response = await openai.chat.completions.create({
             model: import.meta.env.VITE_AI_MODEL,
             messages,
+            stream: true,
         })
-        console.log(response.choices[0].message.content)
-        return response.choices[0].message.content;
+        let output = ''
+        for await (const chunk of response)
+        {
+            output += chunk.choices[0].delta.content;
+        }
+         
     }
     catch (error)
     {
@@ -54,6 +59,5 @@ export async function askAI(msg)
     finally {
         console.log("finished")
     }
-
 }
 
