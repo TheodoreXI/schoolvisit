@@ -21,39 +21,55 @@ export default function SupportWidget() {
   const [isHovered, setIsHovered] = useState(false)
   const [messages, setMessages] = useState([welcomeMessage])
   const [text, setText] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const bodyRef = useRef(null)
   const [openedAt] = useState(getCurrentTime)
 
-  // scroll to the newest message
+  // scroll to the newest message (depends on `messages` so it follows streaming text)
   useEffect(() => {
     if (isOpen) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
-  }, [isOpen, messages.length])
+  }, [isOpen, messages])
 
-  // ---------------------------------------------------------------
-  // YOUR PART: every visitor message goes through this function.
-  // ---------------------------------------------------------------
   async function sendMessage(messageText) {
     const trimmed = messageText.trim()
-    if (!trimmed) return
+    if (!trimmed || isLoading) return
 
-    const newMessage = {
-      id: Date.now(),
+    const visitorMessage = {
+      id: crypto.randomUUID(),
       from: "visitor",
       text: trimmed,
       time: getCurrentTime(),
     }
-    setMessages((prev) => [...prev, newMessage])
-    const reply = await askAI(trimmed)
-    const staffMessage = {
-      id: Date.now(),
-      from: "staff",
-      text: reply,
-      time: getCurrentTime(),
-    }
-    setMessages((prev) => [...prev, staffMessage])
+    const staffId = crypto.randomUUID()
 
-    // TODO (backend / AI): send `trimmed` to your API here.
-    // When the reply comes back, add it with from: "staff".
+    const history = [...messages, visitorMessage]
+      .filter((m) => m.id !== welcomeMessage.id)
+      .map((m) => ({
+        role: m.from === "visitor" ? "user" : "assistant",
+        content: m.text,
+      }))
+
+    // add the visitor message and an empty staff bubble that will fill up
+    setMessages((prev) => [
+      ...prev,
+      visitorMessage,
+      { id: staffId, from: "staff", text: "", time: getCurrentTime() },
+    ])
+    setIsLoading(true)
+
+    const updateStaff = (newText) =>
+      setMessages((prev) =>
+        prev.map((m) => (m.id === staffId ? { ...m, text: newText } : m))
+      )
+
+    try {
+      await askAI(history, updateStaff)
+    } catch (error) {
+      console.error(error)
+      updateStaff("Sorry, I can't access what I need right now. Please try again in a bit.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   function handleSubmit(e) {
@@ -141,7 +157,7 @@ export default function SupportWidget() {
               <div className="w-msg__avatar">S</div>
               <div className="w-msg__content">
                 <span className="w-msg__name">Staff</span>
-                <p className="w-msg__bubble">{message.text}</p>
+                <p className="w-msg__bubble">{message.text || "..."}</p>
                 <span className="w-msg__time">{message.time}</span>
               </div>
             </div>
@@ -184,7 +200,12 @@ export default function SupportWidget() {
               onChange={(e) => setText(e.target.value)}
             />
           </div>
-          <button type="submit" className="send-btn" aria-label="Send message">
+          <button
+            type="submit"
+            className="send-btn"
+            aria-label="Send message"
+            disabled={isLoading}
+          >
             <Send size={16} />
           </button>
         </form>
